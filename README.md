@@ -1,4 +1,7 @@
-# Astra 创世神协议 · UI Up↑ · UI 升级版（极简）
+# Astra 创世神协议 · UI Up↑ UI升级版 极简
+
+> GitHub 仓库 slug 只允许 ASCII（字母/数字/`-`/`_`/`.`），所以建仓时建议用 `astra-genesis-protocol-ui-up`，
+> 中文与 ↑ 放在仓库 Description 或本 README 标题里体现。
 
 RimWorld（边缘世界）**整合包一键启动器**。把「装模组管理器 → 设路径 → 导入排序 → 保存 → 启动游戏」这一整套手工流程压成一个按钮。
 

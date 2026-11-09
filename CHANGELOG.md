@@ -6,13 +6,12 @@
 
 极简 UI 重写版首发（当前版本）。业务逻辑沿用原版，界面全部重做。
 
-### 命名
+### 仓库命名
 
-- 项目名后缀统一为 **UI Up↑ UI升级版 极简**：
-  - 顶栏标题：`ASTRA // 创世神协议 UI Up ↑ UI升级版 极简`
-  - 窗口标题（任务栏/Alt-Tab）：`Astra创世神协议 UI Up↑ UI升级版 极简`
-  - 仓库标题（README）：`Astra 创世神协议 · UI Up↑ · UI 升级版（极简）`
-- 可执行文件名保持 `Astra创世神协议UI Up.exe` 不再加后缀（避免过长牵动脚本与快捷方式）
+- 项目/仓库名：**Astra 创世神协议 · UI Up↑ UI升级版 极简**
+- 本地目录：`Astra创世神协议-UIUp-UI升级版-极简`
+- GitHub slug（ASCII 限制）：`astra-genesis-protocol-ui-up`，中文与 ↑ 写进 Description
+- 启动器界面标题保持原样（顶栏 `ASTRA // 创世神协议 UI up↑`），不随仓库改名
 
 ### 界面
 
