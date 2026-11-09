@@ -1,15 +1,10 @@
 # Astra 创世神协议 · UI Up↑ UI升级版 极简
 
-> GitHub 仓库 slug 只允许 ASCII（字母/数字/`-`/`_`/`.`），所以建仓时建议用 `astra-genesis-protocol-ui-up`，
-> 中文与 ↑ 放在仓库 Description 或本 README 标题里体现。
-
 RimWorld（边缘世界）**整合包一键启动器**。把「装模组管理器 → 设路径 → 导入排序 → 保存 → 启动游戏」这一整套手工流程压成一个按钮。
 
 本仓库是**极简风 UI 重写版**：界面全部自绘，零第三方依赖，用 Windows 自带的 `csc.exe` 手工编译，产物是单个 exe。
 
 ![主页](docs/screenshot-home.png)
-
-> 截图请把 `--shot` 生成的主页图放到 `docs/screenshot-home.png`（见「构建说明」的自检一节）。
 
 ---
 
