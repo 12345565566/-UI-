@@ -4,6 +4,9 @@ RimWorld（边缘世界）**整合包一键启动器**。把「装模组管理�
 
 本仓库是**极简风 UI 重写版**：界面全部自绘，零第三方依赖，用 Windows 自带的 `csc.exe` 手工编译，产物是单个 exe。
 
+> **下载**：到 [Releases](../../releases/latest) 取最新的 `Astra.UI.Up.exe`（单文件，双击即用，无需安装）。
+> 完整更新记录见 [CHANGELOG.md](CHANGELOG.md)。
+
 ![主页](docs/screenshot-home.png)
 
 ---
