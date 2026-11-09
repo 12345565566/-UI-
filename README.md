@@ -99,7 +99,7 @@ taskkill /IM "Astra创世神协议UI Up.exe" /F
 |---|---|
 | **缺陷**（闪退/报错/界面错位） | [新建 Issue](../../issues/new/choose) → 选「缺陷报告」，模板会提示要附哪些日志 |
 | **功能建议** | 同上，选「功能建议」 |
-| **使用问题 / 想直接问** | [QQ 群 1065764792 · 边缘世界大爱盟『镇魔天堡』](https://qun.qq.com/universal-share/share?ac=1&authKey=CRIw7Uic2VBz9eyLrjFN7BxYwKA%2BZu7pTiq0VqWJEqAfNknlbK9ydkL7%2F0Ru9rLj&busi_data=eyJncm91cENvZGUiOiIxMDY1NzY0NzkyIiwidG9rZW4iOiJsdVM4OFhWam9MZ2s0WTVlWHRodXBpd2hkNkNsT085eXo3Smd1VFdHVnhqMTR3UGJKUDRsZkZqQnNBYldSTjRJIiwidWluIjoiMjM1OTk1NTIxNSJ9&data=rXPVVfQqJJxKN7Ivg1TcE4H1HZ1-PYCMzYzySlTwwq6z-SnIyQoNOmDZgPrtMQFP-St9H55_NiXHQX1NBhDfNQ&svctype=4&tempid=h5_group_info) |
+| **使用问题 / 想直接问** | QQ 群 **1065764792** · 边缘世界大爱盟『镇魔天堡』<br>![QQ 群二维码](docs/QQ群二维码-1065764792.jpg) |
 | **安全漏洞** | **不要开公开 issue**，按 [SECURITY.md](SECURITY.md) 走私密渠道 |
 | **改代码** | 先看 [CONTRIBUTING.md](CONTRIBUTING.md) 的硬约束，再提 PR |
 
