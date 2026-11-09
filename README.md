@@ -104,14 +104,14 @@ taskkill /IM "Astra创世神协议UI Up.exe" /F
 
 **本项目以 [MIT 许可证](LICENSE) 发布。**
 
-- 原始代码作者：**正魔天堡之主**（授权记录见 [docs/授权记录.md](docs/授权记录.md)，含群聊截图）
+- 原始代码作者：**ZOGOS**（QQ 昵称「正魔天堡之主」，授权记录见 [docs/授权记录.md](docs/授权记录.md)，含群聊截图）
 - 极简 UI 重写：**A1**
 - 素材库（立绘、配音、群二维码等）按作者说明随代码同属 MIT
 - 仓库中不包含 `ffmpeg.exe` 等第三方二进制，需要时自行放到 `src/tools/`
 
-Copyright (c) 2026 正魔天堡之主, A1
+Copyright (c) 2026 ZOGOS, A1
 
 ## 致谢
 
-- 正魔天堡之主：原版启动器的业务逻辑与 RimWorld 整合包管理方案
+- ZOGOS：原版启动器的业务逻辑与 RimWorld 整合包管理方案
 - RimSort / RimWorld 社区：排序与模组元数据格式参考
