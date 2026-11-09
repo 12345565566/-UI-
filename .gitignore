@@ -1,0 +1,39 @@
+# ── 构建产物 ──
+dist/
+*.exe
+obj/
+_buildtest/
+
+# ── 编译器日志 / 历史备份 ──
+_编译日志.txt
+*.bak
+*.cn2.bak
+
+# ── 运行期数据（不要提交）──
+settings.ini
+ZOGOS备份/
+ZOGOS诊断报告_*.txt
+ZOGOS启动器日志.txt
+packs.ini
+packfeed_cache.txt
+packfeed_meta.txt
+packcovers/
+modname_zh.txt
+voice.ini
+
+# ── 自检截图与临时文件 ──
+并轨截图*/
+*自检截图*/
+_tmp*/
+_verify-build/
+*.log
+trace.txt
+layout.txt
+layout_all.txt
+
+# ── 第三方大文件（自行放置）──
+src/tools/ffmpeg.exe
+
+# ── 系统 ──
+Thumbs.db
+desktop.ini

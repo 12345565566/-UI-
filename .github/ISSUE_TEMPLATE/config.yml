@@ -1,0 +1,8 @@
+# 只保留模板入口，避免空白 issue 冲掉结构
+blank_issues_enabled: false
+
+# 使用问题 / 交流：QQ 群 1065764792（边缘世界大爱盟『镇魔天堡』）
+contact_links:
+  - name: QQ 群 1065764792 · 使用问题 / 交流
+    url: 'https://qun.qq.com/universal-share/share?ac=1&authKey=CRIw7Uic2VBz9eyLrjFN7BxYwKA%2BZu7pTiq0VqWJEqAfNknlbK9ydkL7%2F0Ru9rLj&busi_data=eyJncm91cENvZGUiOiIxMDY1NzY0NzkyIiwidG9rZW4iOiJsdVM4OFhWam9MZ2s0WTVlWHRodXBpd2hkNkNsT085eXo3Smd1VFdHVnhqMTR3UGJKUDRsZkZqQnNBYldSTjRJIiwidWluIjoiMjM1OTk1NTIxNSJ9&data=rXPVVfQqJJxKN7Ivg1TcE4H1HZ1-PYCMzYzySlTwwq6z-SnIyQoNOmDZgPrtMQFP-St9H55_NiXHQX1NBhDfNQ&svctype=4&tempid=h5_group_info'
+    about: 装不上、不会用、想直接问；缺陷请走上面的模板，安全漏洞按 SECURITY.md 走私密渠道

@@ -1,0 +1,94 @@
+name: 🐞 缺陷报告
+description: 闪退、报错、界面错位、功能不对
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        报之前先确认两件事：
+        1. 用的是**最新版 exe**（旧版问题可能已修）
+        2. 日志位置：`%LOCALAPPDATA%\ZOGOS创世神启动器\ZOGOS启动器日志.txt`
+        
+        **贴日志/截图前，把路径里的用户名和 API Key 打码。**
+        
+        不确定算不算 bug、或者只是想问怎么用，直接进 QQ 群 **1065764792**，比开 issue 快。
+
+  - type: textarea
+    id: what
+    attributes:
+      label: 现象
+      description: 发生了什么？越具体越好（哪个页面、点了什么、屏幕上是啥）
+      placeholder: 例：在【排序】页点「用这个方案启动」，弹窗报“替换配置时出错”，之后游戏没起来
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: 一二三四写清楚，能稳定复现最有用
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: 版本
+      description: 看 exe 文件名 + 文件修改时间，或日志第一行的启动时间
+      placeholder: Astra创世神协议UI Up.exe / 2026-11-09 20:37
+    validations:
+      required: true
+
+  - type: dropdown
+    id: osw
+    attributes:
+      label: 系统
+      options:
+        - Windows 11
+        - Windows 10
+        - 其他（请在补充说明里写）
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scale
+    attributes:
+      label: 界面缩放
+      description: 设置页最下面那一项
+      options:
+        - 130%（默认）
+        - 100%
+        - 110%
+        - 120%
+        - 140%
+        - 150% 及以上
+
+  - type: dropdown
+    id: pack
+    attributes:
+      label: 整合包来源
+      options:
+        - 自己组的整合包
+        - 从别人那拿的整合包（ZOGOS 格式）
+        - 导入的 zip
+        - 还没有整合包 / 只是打开界面
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志 / 截图
+      description: 日志末 30 行 + 界面截图（可直接拖进来）
+      render: text
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: 提交前确认
+      options:
+        - label: 用的是最新版
+          required: true
+        - label: 搜过现有 issue，没有重复
+          required: true
+        - label: 日志和截图里没有用户名 / 密钥（或已打码）
+          required: true

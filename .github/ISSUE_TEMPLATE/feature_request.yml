@@ -1,0 +1,38 @@
+name: 💡 功能建议
+description: 想要某个功能，或现有流程太绕
+title: "[建议] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        个人项目，功能基本定型，不保证都会做；但"你现在怎么绕过去的"这种信息很有价值。
+
+  - type: textarea
+    id: need
+    attributes:
+      label: 你想解决什么
+      description: 描述场景，不要一上来就指定实现方式
+      placeholder: 例：每次换整合包都要手动改一次路径，能不能记住上次选的目录
+    validations:
+      required: true
+
+  - type: textarea
+    id: workaround
+    attributes:
+      label: 现在怎么绕过去的
+      description: 有绕法说明需求不致命；没有也照写
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: 你设想的做法（可选）
+      description: 界面上放哪、点了应该发生什么
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: 提交前确认
+      options:
+        - label: 搜过现有 issue / CHANGELOG，确认不是已有功能
+          required: true
