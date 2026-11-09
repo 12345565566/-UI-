@@ -48,7 +48,7 @@ RimWorld（边缘世界）**整合包一键启动器**。把「装模组管理�
 ## 目录结构
 
 ```
-AstraLauncher/
+Astra创世神协议-UIUp-UI升级版-极简/
 ├─ src/                 源码（编译清单 build_gui.rsp 在这里）
 │  ├─ Program.cs        入口 + 命令行参数（--root/--shot/--smoke/--susu/--appdata）
 │  ├─ MainForm.cs       主窗体（五页：主页/排序/设置/分享/诊断）
