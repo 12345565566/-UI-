@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace Zogos
 {
@@ -9,7 +9,7 @@ namespace Zogos
     /// </summary>
     public static class Edition
     {
-        public const string TitleNormal = "Astra创世神协议";
+        public const string TitleNormal = "Astra创世神协议 UI Up↑ UI升级版 极简";
         public const string TitleSponsor = "感恩的心❤，感谢有你！";
 
 #if SPONSOR

@@ -534,7 +534,7 @@ namespace Zogos
     class ElTopBar : El
     {
         static readonly string[] TABS = { "主页", "排序选择", "设置", "分享", "诊断" };
-        const string TitleText = "ASTRA // 创世神协议 UI up↑";
+        const string TitleText = "ASTRA // 创世神协议 UI Up ↑ UI升级版 极简";
         public event Action<int> TabChanged;
         public event EventHandler MinClicked, CloseClicked, ThemeClicked, CoffeeClicked;
         public int Selected;
