@@ -102,6 +102,12 @@ namespace Zogos
         readonly ElCheck[] _chk = new ElCheck[7];
         ElText _lbSetStatus;
         ElBtn _btnSave, _btnOpenBackup, _btnRestore, _btnRedetect, _btnBind, _btnReapply;
+        ElBtn _btnSwitchPack; // 左卡片内「切换整合包」（展开态常驻，折叠态隐藏——折叠时由「更多功能」菜单提供）
+
+        // 深浅色切换的擦除过渡：一条分界线自上而下扫过，线上方已换新主题、线下方还是旧主题
+        System.Windows.Forms.Timer _themeWipe;
+        Bitmap _wipeOld, _wipeNew;
+        int _wipeY;
         ElText _lbScale; // 「界面缩放」标签
         readonly ElBtn[] _scaleOpts = new ElBtn[6]; // 100/115/130/150/175/200% 六个直选档位
         ElInput _focusInput; // 键盘焦点所在输入框（自绘控件，需手动管理）
@@ -405,6 +411,10 @@ namespace Zogos
             _info = AddEl(_homeEls, new ElInfo());
             _info.SortClicked += delegate { SwitchPage(1); };
 
+            // 左卡片内「切换整合包」：与启动圆面同宽（216）、水平居中对齐，位置在信息块正下方
+            _btnSwitchPack = AddEl(_homeEls, new ElBtn(L.T("切换整合包")) { Bold = true });
+            _btnSwitchPack.Clicked += delegate { SwitchPackDialog(); };
+
             // —— 右面板 ——
             // 顶部 4 快捷按钮（「设置」与页签重复已删；「导出整合包」挪到分享页）
             string[] quick = { "导入整合包", "创意工坊", "模组管理", "整合包资源获取" };
@@ -689,6 +699,10 @@ namespace Zogos
             _more.SetBounds(lx + (cw - 190) / 2, ly + 16, 190, 34);
             _launch.SetBounds(lx + (cw - ElLaunch.SIZE) / 2, ly + 110, ElLaunch.SIZE, ElLaunch.SIZE); // 面 216 严格居中
             _info.SetBounds(lx + 16, ly + 366, cw - 32, 96); // 信息块加高：排序选择胶囊挪到了文字上方
+
+            // 「切换整合包」：宽度对齐启动圆面（216），与圆面同一条中线；信息块底部 ly+462，留 16px 间距
+            _btnSwitchPack.SetBounds(lx + (cw - 216) / 2, ly + 478, 216, 36);
+            _btnSwitchPack.Visible = !_collapsed; // 折叠态不重复（折叠时用「更多功能」菜单里的同名项）
 
             int railX = bw - pad - 22;
             _rail.SetBounds(railX, ly + (bh - pad * 2 - 128) / 2, 22, 128);
@@ -1072,10 +1086,87 @@ namespace Zogos
         // —— 一键切换深色模式（顶栏太阳/月亮按钮）：全部自绘，翻转色板重绘即可 ——
         void ToggleTheme()
         {
+            if (_themeWipe != null) return; // 过渡进行中（约 0.3 秒）忽略重复点击，避免两个快照打架
+
+            // 1) 先把当前主题整帧留档；切主题后**只画不推**，避免新主题整帧先闪一下再被动画倒回去
+            Bitmap before = SnapshotFrame();
             T.Dark = !T.Dark;
             _st.UiDark = T.Dark;
             try { _st.Save(); } catch { }
-            Render();
+            SuppressRender = true; // 动画期间屏蔽其它 Render（悬停、提示条等），统一由动画推屏
+            RenderNoPush();
+            Bitmap after = SnapshotFrame();
+            if (before == null || after == null)
+            {
+                SuppressRender = false;
+                if (before != null) before.Dispose();
+                if (after != null) after.Dispose();
+                Render();
+                return;
+            }
+
+            // 2) 分界线自上而下扫：线上方新主题、线下方旧主题，逐帧合成
+            _wipeOld = before;
+            _wipeNew = after;
+            _wipeY = 0;
+            _themeWipe = new System.Windows.Forms.Timer { Interval = 12 };
+            _themeWipe.Tick += delegate { WipeTick(); };
+            _themeWipe.Start();
+        }
+
+        /// <summary>取当前帧缓冲的独立快照（失败返回 null）</summary>
+        Bitmap SnapshotFrame()
+        {
+            try
+            {
+                Bitmap fb = FrameBuffer;
+                if (fb == null || fb.Width <= 0 || fb.Height <= 0) return null;
+                return new Bitmap(fb);
+            }
+            catch { return null; }
+        }
+
+        /// <summary>擦除过渡的一帧：把新帧的上半 + 旧帧的下半拼回去，再画分界线</summary>
+        void WipeTick()
+        {
+            Bitmap fb = FrameBuffer;
+            if (fb == null || _wipeOld == null || _wipeNew == null) { EndWipe(); return; }
+            int w = fb.Width, h = fb.Height;
+            if (_wipeOld.Width != w || _wipeOld.Height != h) { EndWipe(); Render(); return; } // 动画中途窗口尺寸变了，直接收尾
+
+            int step = Math.Max(8, h / 26); // 约 26 帧走完全程（12ms/帧 ≈ 0.3s）
+            _wipeY = Math.Min(h, _wipeY + step);
+            bool done = _wipeY >= h;
+            int y = _wipeY;
+
+            try
+            {
+                using (var g = Graphics.FromImage(fb))
+                {
+                    g.CompositingMode = System.Drawing.Drawing2D.CompositingMode.SourceCopy; // 原样覆写像素（含 alpha）
+                    if (y > 0) g.DrawImage(_wipeNew, new Rectangle(0, 0, w, y), 0, 0, w, y, GraphicsUnit.Pixel);
+                    if (y < h) g.DrawImage(_wipeOld, new Rectangle(0, y, w, h - y), 0, y, w, h - y, GraphicsUnit.Pixel);
+                    g.CompositingMode = System.Drawing.Drawing2D.CompositingMode.SourceOver;
+
+                    if (!done) // 分界线：2px 强调色 + 上方 3px 柔边
+                    {
+                        using (var b = new SolidBrush(Color.FromArgb(60, T.Accent))) g.FillRectangle(b, 0, y - 5, w, 3);
+                        using (var b = new SolidBrush(Color.FromArgb(235, T.Accent))) g.FillRectangle(b, 0, y - 2, w, 2);
+                    }
+                }
+                PushFrame();
+            }
+            catch { EndWipe(); Render(); return; }
+
+            if (done) { EndWipe(); Render(); }
+        }
+
+        void EndWipe()
+        {
+            if (_themeWipe != null) { _themeWipe.Stop(); _themeWipe.Dispose(); _themeWipe = null; }
+            if (_wipeOld != null) { _wipeOld.Dispose(); _wipeOld = null; }
+            if (_wipeNew != null) { _wipeNew.Dispose(); _wipeNew = null; }
+            SuppressRender = false; // 动画结束，恢复正常推屏
         }
 
         // =================================================================

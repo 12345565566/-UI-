@@ -116,6 +116,27 @@ namespace Zogos
                 try { BeginInvoke(new Action(Render)); } catch { }
                 return;
             }
+            if (SuppressRender) return; // 过渡动画自己逐帧推屏，期间屏蔽其它 Render，避免整帧新主题抢先闪出来
+            DrawFrame();
+            Push();
+        }
+
+        /// <summary>只把画面画进帧缓冲、不推屏（过渡动画用：先备好新帧，再由动画逐帧合成）</summary>
+        public void RenderNoPush()
+        {
+            if (IsHandleCreated && InvokeRequired)
+            {
+                try { BeginInvoke(new Action(RenderNoPush)); } catch { }
+                return;
+            }
+            DrawFrame();
+        }
+
+        /// <summary>过渡动画期间为 true：屏蔽普通 Render（只画不推的 RenderNoPush 不受影响）</summary>
+        public bool SuppressRender;
+
+        void DrawFrame()
+        {
             if (!IsHandleCreated || Width <= 0 || Height <= 0) return;
             EnsureBitmaps();
             if (_cache == null) return; // DIB 创建失败的极端兜底
@@ -129,7 +150,6 @@ namespace Zogos
                 PaintContent(g);
             }
             if (FxEnabled) CompositeFx();
-            Push();
         }
 
         /// <summary>
@@ -162,6 +182,12 @@ namespace Zogos
 
         /// <summary>子类可选：在内容之上叠特效层（每帧都画，包括 RenderFxOnly 的廉价刷新）</summary>
         protected virtual void PaintFx(Graphics g) { }
+
+        /// <summary>帧缓冲（物理像素，32bppPArgb，直接包着 DIB 内存）；主题擦除过渡等需要逐像素合成时用</summary>
+        protected Bitmap FrameBuffer { get { return _cache; } }
+
+        /// <summary>手工合成帧缓冲之后推送到屏幕（配合 FrameBuffer 使用）</summary>
+        protected void PushFrame() { Push(); }
 
         byte _pushAlpha = 255;
         /// <summary>整窗不透明度 0-255（乘在逐像素 alpha 上；弹窗淡入动画用，默认 255 不透明）</summary>
