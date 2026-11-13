@@ -28,6 +28,7 @@ namespace Zogos
         private SortScheme _current;
         private int _page;
         private bool _busy;
+        private DateTime _lastBusyRender = DateTime.MinValue;
         private BackgroundWorker _worker;
         private SusuWindow _susu;
         private string _lastExportZip = "";
@@ -1654,7 +1655,16 @@ namespace Zogos
         {
             Log.Info(text);
             // 极简主页没有「运行状态」行：部署中的进度文案合并到启动键副标题
-            if (_busy && !string.IsNullOrEmpty(text)) { _launch.SubText = text; Render(); }
+            if (_busy && !string.IsNullOrEmpty(text))
+            {
+                _launch.SubText = text;
+                // 高频进度（导出/部署）只改文字，画面最多每 200ms 刷一次，避免整窗重绘把 UI 拖死
+                if ((DateTime.Now - _lastBusyRender).TotalMilliseconds >= 200)
+                {
+                    _lastBusyRender = DateTime.Now;
+                    Render();
+                }
+            }
         }
 
         // =================================================================

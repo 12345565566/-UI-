@@ -193,6 +193,9 @@ namespace Zogos
             string outFull = null;
             try { if (!string.IsNullOrEmpty(outZip)) outFull = Path.GetFullPath(outZip); }
             catch { }
+            string outPart = null;
+            try { if (!string.IsNullOrEmpty(outZip)) outPart = Path.GetFullPath(outZip + ".part"); }
+            catch { }
 
             Stack<string> st = new Stack<string>();
             st.Push(root);
@@ -225,7 +228,8 @@ namespace Zogos
                     {
                         string cur = null;
                         try { cur = Path.GetFullPath(fs[i]); } catch { }
-                        if (cur != null && string.Equals(cur, outFull, StringComparison.OrdinalIgnoreCase)) continue;
+                        if (cur != null && (string.Equals(cur, outFull, StringComparison.OrdinalIgnoreCase)
+                            || string.Equals(cur, outPart, StringComparison.OrdinalIgnoreCase))) continue;
                     }
                     res.Add(fs[i]);
                 }
@@ -343,32 +347,45 @@ namespace Zogos
 
                 string dir = Path.GetDirectoryName(outZip);
                 if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir)) Directory.CreateDirectory(dir);
+                string partZip = outZip + ".part";
 
-                // 3) 打包
-                using (FileStream fs = new FileStream(outZip, FileMode.Create, FileAccess.Write))
-                using (ZipArchive zip = new ZipArchive(fs, ZipArchiveMode.Create))
+                // 3) 打包（先写 .part，成功后再改名，失败自动删除）
+                try
                 {
-                    // 说明文件
-                    string readme = BuildReadme(ctx, scheme, full);
-                    ZipArchiveEntry re = zip.CreateEntry(packName + "/" + PackSpec.ReadmeName, CompressionLevel.Optimal);
-                    using (Stream s = re.Open())
-                    using (StreamWriter w = new StreamWriter(s, new UTF8Encoding(false)))
-                        w.Write(readme);
-
-                    for (int i = 0; i < files.Count; i++)
+                    using (FileStream fs = new FileStream(partZip, FileMode.Create, FileAccess.Write))
+                    using (ZipArchive zip = new ZipArchive(fs, ZipArchiveMode.Create))
                     {
-                        string rel = Rel(ctx.Root, files[i]);
-                        string entry = packName + "/" + rel.Replace('\\', '/');
-                        try
+                        // 说明文件
+                        string readme = BuildReadme(ctx, scheme, full);
+                        ZipArchiveEntry re = zip.CreateEntry(packName + "/" + PackSpec.ReadmeName, CompressionLevel.Optimal);
+                        using (Stream s = re.Open())
+                        using (StreamWriter w = new StreamWriter(s, new UTF8Encoding(false)))
+                            w.Write(readme);
+
+                        const int PROGRESS_STEP = 500;   // 每 500 个文件才回调一次，避免 UI 消息洪水
+                        for (int i = 0; i < files.Count; i++)
                         {
-                            zip.CreateEntryFromFile(files[i], entry, LevelFor(files[i]));
+                            string rel = Rel(ctx.Root, files[i]);
+                            string entry = packName + "/" + rel.Replace('\\', '/');
+                            try
+                            {
+                                zip.CreateEntryFromFile(files[i], entry, LevelFor(files[i]));
+                            }
+                            catch (Exception ex)
+                            {
+                                r.Warnings.Add(L.T("跳过 ") + rel + "：" + ex.Message);
+                            }
+                            if (prog != null && (i % PROGRESS_STEP == 0 || i == files.Count - 1))
+                                prog(i + 1, files.Count, rel);
                         }
-                        catch (Exception ex)
-                        {
-                            r.Warnings.Add(L.T("跳过 ") + rel + "：" + ex.Message);
-                        }
-                        if (prog != null) prog(i + 1, files.Count, rel);
                     }
+                    if (File.Exists(outZip)) File.Delete(outZip);
+                    File.Move(partZip, outZip);
+                }
+                catch
+                {
+                    try { if (File.Exists(partZip)) File.Delete(partZip); } catch { }
+                    throw;
                 }
 
                 r.Files = files.Count + 1;
@@ -523,11 +540,12 @@ namespace Zogos
             using (ZipArchive zip = new ZipArchive(fs, ZipArchiveMode.Read))
             {
                 int count = zip.Entries.Count;
+                const int EXTRACT_STEP = 500;   // 解压同样节流：每 500 个条目回调一次
                 for (int i = 0; i < count; i++)
                 {
                     ZipArchiveEntry e = zip.Entries[i];
                     string rel = e.FullName.Replace('\\', '/');
-                    if (prog != null) prog(i + 1, count, e.Name);
+                    if (prog != null && (i % EXTRACT_STEP == 0 || i == count - 1)) prog(i + 1, count, e.Name);
 
                     if (rel.EndsWith("/") || e.Name.Length == 0) continue;
 
