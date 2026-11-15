@@ -25,7 +25,7 @@ namespace Zogos
             Application.SetCompatibleTextRenderingDefault(false);
 
             string launcherDir = Application.StartupPath;
-            string appData = null, rootOverride = null, targetOverride = null, shotDir = null, smokeDir = null, susuDir = null;
+            string appData = null, rootOverride = null, targetOverride = null, shotDir = null, smokeDir = null, susuDir = null, progDir = null;
             for (int i = 0; i < args.Length; i++)
             {
                 string a = args[i];
@@ -35,6 +35,7 @@ namespace Zogos
                 else if (a == "--shot" && i + 1 < args.Length) shotDir = args[++i];
                 else if (a == "--susu" && i + 1 < args.Length) susuDir = args[++i];
                 else if (a == "--smoke" && i + 1 < args.Length) smokeDir = args[++i];
+                else if (a == "--progshot" && i + 1 < args.Length) progDir = args[++i];
             }
             if (appData == null) appData = AppDataDir();
 
@@ -96,6 +97,12 @@ namespace Zogos
             if (!string.IsNullOrEmpty(smokeDir))
             {
                 SmokeTest(ctx, st, smokeDir);
+                return;
+            }
+
+            if (!string.IsNullOrEmpty(progDir))
+            {
+                ProgressShots(ctx, st, progDir);
                 return;
             }
 
@@ -296,6 +303,42 @@ namespace Zogos
             Tr(dir, "layout_all.txt 已写出");
             try { form.Dispose(); } catch { }
             Tr(dir, "SmokeTest 结束");
+        }
+
+        /// <summary>忙碌遮罩进度条自检（--progshot）：0=导出 37% / 1=导入 88% / 2=跑马灯 / 3=部署默认</summary>
+        private static void ProgressShots(PackContext ctx, Settings st, string dir)
+        {
+            try { if (!Directory.Exists(dir)) Directory.CreateDirectory(dir); }
+            catch (Exception ex) { Console.WriteLine("无法创建目录: " + ex.Message); return; }
+            MainForm form = null;
+            try
+            {
+                form = new MainForm(ctx, st);
+                form.StartPosition = FormStartPosition.Manual;
+                form.Location = new Point(0, 0);
+                form.Show();
+                Application.DoEvents();
+                Thread.Sleep(300);
+                Application.DoEvents();
+                for (int mode = 0; mode < 4; mode++)
+                {
+                    form.DebugBusyPreview(dir, mode);
+                    Application.DoEvents();
+                    Console.WriteLine("saved busy_" + mode + ".png");
+                }
+            }
+            catch (Exception ex)
+            {
+                Exception e = ex;
+                while (e.InnerException != null) e = e.InnerException;
+                Tr(dir, "progshot EX: " + e.GetType().Name + " :: " + e.Message + "\n" + e.StackTrace);
+                Console.WriteLine("progshot 失败: " + e.Message);
+            }
+            finally
+            {
+                try { if (form != null) form.Close(); } catch { }
+                try { if (form != null) form.Dispose(); } catch { }
+            }
         }
 
         /// <summary>把每个页面渲染成 PNG（用于自动化检查界面布局）。</summary>

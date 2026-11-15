@@ -712,7 +712,7 @@ namespace Zogos
             using (var b = new SolidBrush(T.Text))
                 g.DrawString(TitleText, T.B(13), b, Bounds.X + 46, Bounds.Y + h / 2 - 13);
             using (var b = new SolidBrush(T.Text3))
-                g.DrawString("v1.7.0", T.F(11), b, Bounds.X + 46 + TextRenderer.MeasureText(TitleText, T.B(13)).Width + 8, Bounds.Y + h / 2 - 10);
+                g.DrawString("v" + Log.Version, T.F(11), b, Bounds.X + 46 + TextRenderer.MeasureText(TitleText, T.B(13)).Width + 8, Bounds.Y + h / 2 - 10);
 
             // 页签（窄模式下为空矩形，跳过）；选中胶囊带滑动过渡
             if (_pillOn && !_pill.IsEmpty)
@@ -1344,6 +1344,80 @@ namespace Zogos
                 float th = Math.Max(16f, Bounds.Height * vis / (float)Lines.Count);
                 float ty = Bounds.Y + (Bounds.Height - th) * (1f - (Lines.Count - vis - _scroll) / (float)(Lines.Count - vis));
                 T.FillRound(g, new RectangleF(Bounds.Right - 5, ty, 3, th), 1.5f, T.Line);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 细长进度条：圆角槽 + 强调色填充，右侧百分比、下方说明文字。
+    /// Value 0..1 = 确定进度；Indeterminate=true 表示总数未知（如还在统计文件），
+    /// 用一段高亮块在槽内来回滑动，相位由宿主定时器调 TickPhase 推进。
+    /// </summary>
+    class ElProgress : El
+    {
+        public float Value;          // 0..1
+        public bool Indeterminate;   // 跑马灯：总数未知
+        public string Text = "";     // 槽下方说明文字（可空）
+        public bool ShowPercent = true;
+        public float BarHeight = 8f;
+
+        float _phase;                // 跑马灯相位 0..1
+
+        public void TickPhase(float step)
+        {
+            _phase += step;
+            while (_phase > 1f) _phase -= 1f;
+        }
+
+        public override void Paint(Graphics g)
+        {
+            float w = Bounds.Width;
+            float h = Math.Min(BarHeight, Bounds.Height);
+            if (w < 8f || h < 2f) return;
+
+            T.FillRound(g, new RectangleF(Bounds.X, Bounds.Y, w, h), h / 2f, T.Line2);
+
+            if (Indeterminate)
+            {
+                float sw = Math.Max(28f, w * 0.26f);
+                float t = _phase < 0.5f ? _phase * 2f : (1f - _phase) * 2f; // 0→1→0 往返
+                T.FillRound(g, new RectangleF(Bounds.X + (w - sw) * t, Bounds.Y, sw, h), h / 2f, T.Accent);
+            }
+            else
+            {
+                float v = Value < 0f ? 0f : Value > 1f ? 1f : Value;
+                float fw = w * v;
+                if (fw > 0.01f)
+                    T.FillRound(g, new RectangleF(Bounds.X, Bounds.Y, Math.Max(fw, h), h), h / 2f, T.Accent);
+            }
+
+            var f = T.F(11.5f);
+            float textY = Bounds.Y + h + 5;
+            bool pct = ShowPercent && !Indeterminate;
+            if (pct)
+            {
+                float v = Value < 0f ? 0f : Value > 1f ? 1f : Value;
+                string pc = (int)Math.Round(v * 100f) + "%";
+                var sz = TextRenderer.MeasureText(pc, f);
+                using (var b = new SolidBrush(T.Text3))
+                    g.DrawString(pc, f, b, Bounds.Right - sz.Width, textY);
+            }
+            if (!string.IsNullOrEmpty(Text))
+            {
+                string s = Text;
+                float maxW = w - (pct ? 54f : 0f);
+                if (maxW > 30f && TextRenderer.MeasureText(s, f).Width > maxW)
+                {
+                    int lo = 0, hi = s.Length;
+                    while (lo < hi)
+                    {
+                        int mid = (lo + hi + 1) / 2;
+                        if (TextRenderer.MeasureText(s.Substring(0, mid) + "…", f).Width <= maxW) lo = mid; else hi = mid - 1;
+                    }
+                    s = s.Substring(0, lo) + "…";
+                }
+                using (var b = new SolidBrush(T.Text3))
+                    g.DrawString(s, f, b, Bounds.X, textY);
             }
         }
     }

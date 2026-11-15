@@ -29,6 +29,12 @@ namespace Zogos
         private int _page;
         private bool _busy;
         private DateTime _lastBusyRender = DateTime.MinValue;
+
+        // —— 忙碌遮罩里的任务标题/副标题与进度条（导出、导入等长任务共用）——
+        string _busyTitle = "";
+        string _busySub = "";
+        readonly ElProgress _busyBar = new ElProgress { Visible = false };
+        System.Windows.Forms.Timer _busyAnim; // 总数未知阶段的跑马灯
         private BackgroundWorker _worker;
         private SusuWindow _susu;
         private string _lastExportZip = "";
@@ -1393,18 +1399,37 @@ namespace Zogos
             if (_busy)
             {
                 var r = new RectangleF(0, 46, Lw, Lh - 46);
-                using (var b = new SolidBrush(Color.FromArgb(170, T.Window))) g.FillRectangle(b, r);
-                string t1 = L.T("正在加载中，请稍候…");
-                string t2 = L.T("正在备份并写入配置，请不要关闭窗口");
+                using (var b = new SolidBrush(Color.FromArgb(200, T.Window))) g.FillRectangle(b, r);
+
+                string t1 = _busyTitle.Length > 0 ? _busyTitle : L.T("正在加载中，请稍候…");
+                string t2 = _busySub.Length > 0 ? _busySub : L.T("正在备份并写入配置，请不要关闭窗口");
                 var f1 = T.B(15);
                 var f2 = T.F(12);
-                var s1 = TextRenderer.MeasureText(t1, f1);
-                var s2 = TextRenderer.MeasureText(t2, f2);
+                bool bar = _busyBar.Visible;
+
+                // 中间实底卡片：遮罩只是变淡底，文字直接压在正文上会糊成一团，必须有承载面
+                float cw = Math.Max(260f, Math.Min(560f, Lw - 120f));
+                float chh = bar ? 148f : 104f;
                 float cx = Lw / 2f, cy = 46 + (Lh - 46) / 2f;
+                var card = new RectangleF(cx - cw / 2f, cy - chh / 2f, cw, chh);
+                T.FillRound(g, new RectangleF(card.X + 3, card.Y + 8, card.Width, card.Height), 14, Color.FromArgb(26, 28, 27, 23));
+                T.FillRound(g, card, 14, T.Card);
+                T.DrawRound(g, new RectangleF(card.X + 0.5f, card.Y + 0.5f, card.Width - 1f, card.Height - 1f), 14, T.Line, 1f);
+
+                string s1 = FitText(t1, f1, cw - 48f);
+                string s2 = FitText(t2, f2, cw - 48f);
+                float s1w = TextRenderer.MeasureText(s1, f1).Width;
+                float s2w = TextRenderer.MeasureText(s2, f2).Width;
                 using (var b1 = new SolidBrush(T.Text))
-                    g.DrawString(t1, f1, b1, cx - s1.Width / 2f, cy - 26);
+                    g.DrawString(s1, f1, b1, cx - s1w / 2f, card.Y + 26);
                 using (var b2 = new SolidBrush(T.Text3))
-                    g.DrawString(t2, f2, b2, cx - s2.Width / 2f, cy + 6);
+                    g.DrawString(s2, f2, b2, cx - s2w / 2f, card.Y + 54);
+                if (bar)
+                {
+                    int bw = (int)(cw - 76f);
+                    _busyBar.SetBounds((int)(cx - bw / 2f), (int)(card.Y + 84), bw, 8);
+                    _busyBar.Paint(g);
+                }
             }
 
             if (_overlayEls != null) // 模态覆盖层：遮罩 + 面板（面板整体带上滑动效）
@@ -1417,6 +1442,20 @@ namespace Zogos
             }
 
             for (int i = 0; i < _toasts.Count; i++) _toasts[i].Paint(g); // 提示条压在最顶层（含忙碌遮罩之上）
+        }
+
+        /// <summary>按可用宽度截断文字并补省略号（忙碌卡片的副标题可能带很长路径）</summary>
+        static string FitText(string s, Font f, float maxW)
+        {
+            if (string.IsNullOrEmpty(s) || maxW <= 20f) return s ?? "";
+            if (TextRenderer.MeasureText(s, f).Width <= maxW) return s;
+            int lo = 0, hi = s.Length;
+            while (lo < hi)
+            {
+                int mid = (lo + hi + 1) / 2;
+                if (TextRenderer.MeasureText(s.Substring(0, mid) + "…", f).Width <= maxW) lo = mid; else hi = mid - 1;
+            }
+            return s.Substring(0, lo) + "…";
         }
 
         /// <summary>特效层开关跟随 FrameFx.Enabled：关闭时渲染走单缓冲直通（无合成、无特效计时器）</summary>
@@ -1801,10 +1840,82 @@ namespace Zogos
             _launch.Busy = busy;
             _btnApply.Enabled = !busy;
             if (_btnExport != null) { _btnExport.Enabled = !busy; _btnImport.Enabled = !busy; }
-            if (busy) { _launch.SubText = L.T("正在处理配置，请稍候…"); }
-            else if (_launch.SubText != L.T("游戏运行中") && _current != null)
-                _launch.SubText = _current.Mods.Count + L.T(" 个模组 · ") + _current.Name;
+            if (busy)
+            {
+                _launch.SubText = L.T("正在处理配置，请稍候…");
+                // 遮罩默认文案（部署/启动这类短任务）；导出/导入会随后用 SetBusyTask 换成自己的
+                _busyTitle = L.T("正在加载中，请稍候…");
+                _busySub = L.T("正在备份并写入配置，请不要关闭窗口");
+                _busyBar.Value = 0f;
+                _busyBar.Indeterminate = false;
+                _busyBar.Text = "";
+                _busyBar.Visible = false;
+                _lastBusyRender = DateTime.MinValue;
+            }
+            else
+            {
+                StopBusyAnim();
+                _busyBar.Visible = false;
+                _busyBar.Text = "";
+                if (_launch.SubText != L.T("游戏运行中") && _current != null)
+                    _launch.SubText = _current.Mods.Count + L.T(" 个模组 · ") + _current.Name;
+            }
             Render(); // busy=true 时 PaintContent 会画遮罩（对应原 LoadingOverlay.ShowOverlay）
+        }
+
+        /// <summary>换掉忙碌遮罩上的标题/副标题（导出、导入等长任务用；部署/启动沿用默认文案）</summary>
+        private void SetBusyTask(string title, string sub)
+        {
+            _busyTitle = title ?? "";
+            _busySub = sub ?? "";
+            if (_busy) Render();
+        }
+
+        /// <summary>
+        /// 推进忙碌遮罩里的进度条。p &gt;= 0：确定进度（0..1）；p &lt; 0：总数未知 → 跑马灯 + Text 里的计数。
+        /// 渲染节流 100ms，避免整窗重绘跟着回调洪水跑。
+        /// </summary>
+        private void SetBusyProgress(float p, string text)
+        {
+            _busyBar.Text = text ?? "";
+            if (p < 0f)
+            {
+                _busyBar.Indeterminate = true;
+                StartBusyAnim();
+            }
+            else
+            {
+                _busyBar.Indeterminate = false;
+                _busyBar.Value = p > 1f ? 1f : p;
+                StopBusyAnim();
+            }
+            _busyBar.Visible = true;
+            if ((DateTime.Now - _lastBusyRender).TotalMilliseconds >= 100)
+            {
+                _lastBusyRender = DateTime.Now;
+                Render();
+            }
+        }
+
+        void StartBusyAnim()
+        {
+            if (_busyAnim != null || !_busy) return;
+            _busyAnim = new System.Windows.Forms.Timer { Interval = 60 };
+            _busyAnim.Tick += delegate
+            {
+                if (!_busy) { StopBusyAnim(); return; }
+                _busyBar.TickPhase(0.04f);
+                Render();
+            };
+            _busyAnim.Start();
+        }
+
+        void StopBusyAnim()
+        {
+            if (_busyAnim == null) return;
+            _busyAnim.Stop();
+            _busyAnim.Dispose();
+            _busyAnim = null;
         }
 
         private void StartGame()
@@ -4283,6 +4394,7 @@ namespace Zogos
             }
 
             SetBusy(true);
+            SetBusyTask(L.T("正在导出整合包…"), full ? L.T("完整包：含游戏本体 + 全部模组") : L.T("轻量包：只含配置 + 排序"));
             SetStatus(full ? L.T("正在导出完整包（可能要几分钟）…") : L.T("正在导出轻量包…"));
             _worker = new BackgroundWorker();
             _worker.WorkerReportsProgress = true;
@@ -4290,17 +4402,24 @@ namespace Zogos
             {
                 BackgroundWorker w = s as BackgroundWorker;
                 ExportResult rr = PackExporter.Export(_ctx, _current, full, outZip,
-                    delegate(string m) { if (w != null) w.ReportProgress(0, m); },
+                    delegate(string m) { if (w != null) w.ReportProgress(-2, m); },   // 只更新副标题
                     delegate(int i, int n, string name)
                     {
-                        if (w != null) w.ReportProgress(0, L.T("打包 ") + i + "/" + n + "   " + name);
+                        if (w != null) w.ReportProgress(n <= 0 ? 0 : (int)((long)i * 100 / n), L.T("打包 ") + i + "/" + n + "   " + name);
+                    },
+                    delegate(int scanned)   // 统计阶段：总数未知，用跑马灯 + 已找到数
+                    {
+                        if (w != null) w.ReportProgress(-1, L.T("正在统计文件…已找到 ") + scanned + L.T(" 个"));
                     });
                 e.Result = rr;
             };
             _worker.ProgressChanged += delegate(object s, ProgressChangedEventArgs e)
             {
                 string m = Convert.ToString(e.UserState);
-                if (!string.IsNullOrEmpty(m)) SetStatus(m);
+                if (string.IsNullOrEmpty(m)) return;
+                if (e.ProgressPercentage == -2) SetBusyTask(L.T("正在导出整合包…"), m);   // 日志行 → 副标题
+                else if (e.ProgressPercentage < 0) { SetBusyProgress(-1f, m); SetStatus(m); } // 统计中：不确定进度
+                else { SetBusyProgress(e.ProgressPercentage / 100f, m); SetStatus(m); }       // 打包中：确定进度
             };
             _worker.RunWorkerCompleted += delegate(object s, RunWorkerCompletedEventArgs e)
             {
@@ -4360,6 +4479,7 @@ namespace Zogos
             }
 
             SetBusy(true);
+            SetBusyTask(L.T("正在导入整合包…"), L.T("解压到 ") + dest);
             SetStatus(L.T("正在解压…"));
             _worker = new BackgroundWorker();
             _worker.WorkerReportsProgress = true;
@@ -4369,14 +4489,16 @@ namespace Zogos
                 List<string> errs = new List<string>();
                 int n = PackImporter.Extract(zip, dest, delegate(int i, int all, string name)
                 {
-                    if (w != null) w.ReportProgress(0, L.T("解压 ") + i + "/" + all + "   " + name);
+                    if (w != null) w.ReportProgress(all <= 0 ? 0 : (int)((long)i * 100 / all), L.T("解压 ") + i + "/" + all + "   " + name);
                 }, errs);
                 e.Result = new object[] { n, errs };
             };
             _worker.ProgressChanged += delegate(object s, ProgressChangedEventArgs e)
             {
                 string m = Convert.ToString(e.UserState);
-                if (!string.IsNullOrEmpty(m)) SetStatus(m);
+                if (string.IsNullOrEmpty(m)) return;
+                SetBusyProgress(e.ProgressPercentage / 100f, m);
+                SetStatus(m);
             };
             _worker.RunWorkerCompleted += delegate(object s, RunWorkerCompletedEventArgs e)
             {
@@ -4443,6 +4565,37 @@ namespace Zogos
                 Log.Info(L.T("苏苏上线：") + (firstTime ? L.T("首次启动引导") : L.T("打开功能菜单（体检/目录/从头讲/AI）")));
             }
             catch (Exception ex) { Log.Error(L.T("打开苏苏失败"), ex); }
+        }
+
+        /// <summary>
+        /// 自检（--progshot）：把忙碌遮罩摆到指定状态并渲染成 PNG，不依赖真实桌面截屏。
+        /// mode：0=导出 37%；1=导入 88%；2=统计文件（跑马灯）；3=部署默认文案
+        /// </summary>
+        public void DebugBusyPreview(string dir, int mode)
+        {
+            SetBusy(true);
+            if (mode == 3)
+            {
+                SetBusyProgress(0.5f, L.T("正在备份并写入配置…"));
+            }
+            else if (mode == 2)
+            {
+                SetBusyTask(L.T("正在导出整合包…"), L.T("完整包：含游戏本体 + 全部模组"));
+                SetBusyProgress(-1f, L.T("正在统计文件…已找到 64000 个"));
+                _busyBar.TickPhase(0.5f); // 跑马灯摆到中间
+            }
+            else if (mode == 0)
+            {
+                SetBusyTask(L.T("正在导出整合包…"), L.T("完整包：含游戏本体 + 全部模组"));
+                SetBusyProgress(0.37f, L.T("打包 10600/28700   RimWorld/Mods/Core/About.xml"));
+            }
+            else
+            {
+                SetBusyTask(L.T("正在导入整合包…"), L.T("正在解压…"));
+                SetBusyProgress(0.88f, L.T("解压 253000/287600   RimWorld/Mods/SomeLongModName/Textures/Thing.png"));
+            }
+            Render();
+            SavePreview(System.IO.Path.Combine(dir, "busy_" + mode + ".png"));
         }
 
         /// <summary>给苏苏用：直接打开导入对话框。</summary>

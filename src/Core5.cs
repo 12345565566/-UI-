@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
@@ -188,6 +188,12 @@ namespace Zogos
 
         public static List<string> CollectFiles(PackContext ctx, bool full, string outZip, List<string> warnings)
         {
+            return CollectFiles(ctx, full, outZip, warnings, null);
+        }
+
+        /// <summary>收集待打包文件；onScan 每扫到 SCAN_STEP 个文件回调一次（已收集数），供 UI 显示扫描进度</summary>
+        public static List<string> CollectFiles(PackContext ctx, bool full, string outZip, List<string> warnings, Action<int> onScan)
+        {
             List<string> res = new List<string>();
             string root = ctx.Root;
             string outFull = null;
@@ -196,6 +202,8 @@ namespace Zogos
             string outPart = null;
             try { if (!string.IsNullOrEmpty(outZip)) outPart = Path.GetFullPath(outZip + ".part"); }
             catch { }
+            const int SCAN_STEP = 2000; // 目录树遍历可能几十万文件，每 2000 个才回调一次
+            int lastScan = 0;
 
             Stack<string> st = new Stack<string>();
             st.Push(root);
@@ -232,6 +240,11 @@ namespace Zogos
                             || string.Equals(cur, outPart, StringComparison.OrdinalIgnoreCase))) continue;
                     }
                     res.Add(fs[i]);
+                }
+                if (onScan != null && res.Count - lastScan >= SCAN_STEP)
+                {
+                    lastScan = res.Count;
+                    onScan(res.Count);
                 }
             }
             return res;
@@ -296,7 +309,7 @@ namespace Zogos
             return sb.ToString();
         }
 
-        public static ExportResult Export(PackContext ctx, SortScheme scheme, bool full, string outZip, Action<string> log, Action<int, int, string> prog)
+        public static ExportResult Export(PackContext ctx, SortScheme scheme, bool full, string outZip, Action<string> log, Action<int, int, string> prog, Action<int> scan = null)
         {
             ExportResult r = new ExportResult();
             r.ZipPath = outZip;
@@ -320,9 +333,9 @@ namespace Zogos
 
                 string packName = PackSpec.PackNameOf(ctx);
 
-                // 2) 收集文件
+                // 2) 收集文件（onScan：边扫边报已收集数，UI 用不确定进度 + 计数）
                 if (log != null) log(L.T("正在统计文件…"));
-                List<string> files = CollectFiles(ctx, full, outZip, r.Warnings);
+                List<string> files = CollectFiles(ctx, full, outZip, r.Warnings, scan);
                 long total = 0;
                 for (int i = 0; i < files.Count; i++)
                 {
