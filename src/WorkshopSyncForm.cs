@@ -878,19 +878,16 @@ namespace Zogos
 
         void PickSteamCmd()
         {
-            using (OpenFileDialog d = new OpenFileDialog())
+            string pick = FilePick.Pick(this, L.T("选择 steamcmd.exe"), PickMode.OpenFile,
+                L.T("steamcmd.exe|steamcmd.exe|可执行文件|*.exe"), _st != null ? _st.SteamCmdPath : null, null);
+            if (pick != null)
             {
-                d.Title = L.T("选择 steamcmd.exe");
-                d.Filter = L.T("steamcmd.exe|steamcmd.exe|可执行文件|*.exe");
-                if (d.ShowDialog(this) == DialogResult.OK)
-                {
-                    if (_st != null) { _st.SteamCmdPath = d.FileName; _st.Save(); }
-                    ReportClear();
-                    Append(L.T("steamcmd 已设为：") + d.FileName);
-                    Append("");
-                    Append(L.T("有了 steamcmd，就可以不开 Steam 客户端、不开梯子直接下载工坊内容。"));
-                    SetStatus(L.T("steamcmd 路径已保存。"));
-                }
+                if (_st != null) { _st.SteamCmdPath = pick; _st.Save(); }
+                ReportClear();
+                Append(L.T("steamcmd 已设为：") + pick);
+                Append("");
+                Append(L.T("有了 steamcmd，就可以不开 Steam 客户端、不开梯子直接下载工坊内容。"));
+                SetStatus(L.T("steamcmd 路径已保存。"));
             }
         }
     }

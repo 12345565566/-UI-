@@ -80,6 +80,12 @@ namespace Zogos
             return p;
         }
 
+        // —— 文字统一入口（主进度这版没有描边功能，四个重载直接转发 DrawString；
+        //    选择器 PickUI.cs / FolderPick.cs 里全部走它，和 AstraNewUI 保持同一套调用）——
+        public static void DrawStr(Graphics g, string s, Font f, Brush br, float x, float y, StringFormat sf = null) { g.DrawString(s, f, br, x, y, sf); }
+        public static void DrawStr(Graphics g, string s, Font f, Brush br, RectangleF r, StringFormat sf = null) { g.DrawString(s, f, br, r, sf); }
+        public static void DrawStr(Graphics g, string s, Font f, Color c, float x, float y, StringFormat sf = null) { using (var b = new SolidBrush(c)) g.DrawString(s, f, b, x, y, sf); }
+        public static void DrawStr(Graphics g, string s, Font f, Color c, RectangleF r, StringFormat sf = null) { using (var b = new SolidBrush(c)) g.DrawString(s, f, b, r, sf); }
         public static void FillRound(Graphics g, RectangleF r, float rad, Color c)
         {
             using (var p = Round(r, rad)) using (var b = new SolidBrush(c)) { g.FillPath(b, p); }

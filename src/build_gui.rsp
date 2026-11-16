@@ -78,6 +78,8 @@ MinWorkshop.cs
 MinFeed.cs
 MinGraph.cs
 MinSusu.cs
+FolderPick.cs
+PickUI.cs
 MainForm.cs
 Program.cs
 @voice.resources.rsp

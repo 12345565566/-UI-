@@ -128,6 +128,7 @@ namespace Zogos
         // —— 模态覆盖层（创意工坊 / 模组管理）：固定覆盖在主窗口上层，弹出时主 UI 不可交互 ——
         // 自绘元素、随 UiScale 缩放（布局全部用逻辑坐标）；打开时遮罩淡入 + 面板上滑 20px，9 帧 ease-out。
         List<El> _overlayEls;          // null = 无覆盖层
+        PickOverlay _pick;             // 选文件/选文件夹覆盖层（首次用到时创建，元素复用）
         ElDim _dim;                    // 全窗半透明遮罩（点遮罩关闭）
         Action _overlayLayout;         // 窗口尺寸变化时重排覆盖层
         ElInput[] _ovlInputs;          // 当前覆盖层的输入框 Tab 序
@@ -399,6 +400,10 @@ namespace Zogos
             _focusInput = inp;
             if (_focusInput != null) _focusInput.SetFocus(true);
         }
+
+        // —— 给覆盖层控制器（PickOverlay）用的最小接口，内部字段不对外开放 ——
+        internal ElInput FocusInputPublic { get { return _focusInput; } }
+        internal void SetFocusInputPublic(ElInput inp) { SetFocusInput(inp); }
 
         // =================================================================
         //  构建界面
@@ -1332,6 +1337,8 @@ namespace Zogos
             if (_overlayEls != null) // 模态覆盖层键盘：Esc 关闭 / Tab 在输入框间循环 / Enter 触发主操作
             {
                 Keys k0 = keyData & Keys.KeyCode;
+                // 选择器覆盖层自己处理 Esc/Enter/方向键/Ctrl+L，先让它吃
+                if (_pick != null && _overlayEls == _pick.Els && _pick.HandleKey(keyData)) return true;
                 if (k0 == Keys.Escape)
                 {
                     if (_focusInput != null) SetFocusInput(null);
@@ -2270,6 +2277,45 @@ namespace Zogos
             if (_ctx.Problems.Count == 0) SetStatus(L.T("检测通过，可以启动"));
         }
 
+        /// <summary>
+        /// 窗口内选择器（模态覆盖层）。和创意工坊/个性化同一套 El 元素与开合动画，
+        /// 不是独立窗口——主窗是 UpdateLayeredWindow 分层窗口，真控件放进去不显示。
+        /// 同步语义：内部起嵌套消息泵，用户选完才返回，调用点写法保持原样。
+        /// </summary>
+        string PickNow(string title, PickMode mode, string filter, string initial, string suggest)
+        {
+            if (_busy)
+            {
+                Toast(L.T("正在忙，等这一步做完再选"));
+                return null;
+            }
+            if (_pick == null) _pick = new PickOverlay(this);
+            _pick.Begin(title, mode, filter, initial, suggest);
+            OpenOverlay(_pick.Els,
+                delegate { _pick.Layout(new Rectangle(28, 50, Math.Max(400, Lw - 56), Math.Max(300, Lh - 58))); },
+                _pick.Inputs);
+            _pick.Modal(delegate { CloseOverlay(); });
+            return _pick.Ok ? _pick.Result : null;
+        }
+
+        /// <summary>选文件夹。系统对话框在本机一律卡死（见 08 号文档），这里走窗口内覆盖层。</summary>
+        string PickFolder(string desc, string initial)
+        {
+            Log.Info(L.T("打开文件夹选择框…") + " " + desc);
+            string r = PickNow(desc, PickMode.Folder, null, initial, null);
+            Log.Info(L.T("文件夹选择框返回：") + (r == null ? L.T("取消") : r));
+            return r;
+        }
+
+        /// <summary>选文件（打开/保存）。filter 与系统对话框同格式："视频文件|*.mp4;*.webm|所有文件|*.*"。</summary>
+        string PickFile(string desc, PickMode mode, string filter, string initial, string suggest)
+        {
+            Log.Info(L.T("打开文件选择框…") + " " + desc);
+            string r = PickNow(desc, mode, filter, initial, suggest);
+            Log.Info(L.T("文件选择框返回：") + (r == null ? L.T("取消") : r));
+            return r;
+        }
+
         private void RestoreFromBackup()
         {
             List<string> backups = ConfigDeployer.ListBackups(_ctx.BackupDir);
@@ -2280,13 +2326,9 @@ namespace Zogos
                 return;
             }
 
-            using (FolderBrowserDialog d = new FolderBrowserDialog())
+            string sel = PickFolder(L.T("选择要还原的备份文件夹（默认已指向最新的备份）"), backups[0]);
+            if (sel != null)
             {
-                d.Description = L.T("选择要还原的备份文件夹（默认已指向最新的备份）");
-                d.SelectedPath = backups[0];
-                if (d.ShowDialog(this) != DialogResult.OK) return;
-
-                string sel = d.SelectedPath;
                 if (MinMsg.Show(this,
                     L.T("确定用这个备份覆盖当前的游戏配置吗？\n\n") + sel + L.T("\n\n（当前配置会先被自动备份一次，可以再还原回来）"),
                     L.T("确认还原"), MessageBoxButtons.OKCancel, MessageBoxIcon.Warning) != DialogResult.OK) return;
@@ -2316,28 +2358,15 @@ namespace Zogos
 
         private void BrowseInto(ElInput target, string desc)
         {
-            using (FolderBrowserDialog d = new FolderBrowserDialog())
-            {
-                d.Description = desc;
-                try
-                {
-                    string cur = target.Text.Trim();
-                    if (cur.Length > 0 && Directory.Exists(cur)) d.SelectedPath = cur;
-                }
-                catch { }
-                if (d.ShowDialog(this) == DialogResult.OK) { target.Text = d.SelectedPath; Render(); }
-            }
+            string pick = PickFolder(desc, target.Text.Trim());
+            if (pick != null) { target.Text = pick; Render(); }
         }
 
         private void BindPackFolder()
         {
-            using (FolderBrowserDialog d = new FolderBrowserDialog())
+            string sel = PickFolder(L.T("选择整合包文件夹（里面要有 RimWorld、Config、排序文件 这三个文件夹）"), _ctx.Root);
+            if (sel != null)
             {
-                d.Description = L.T("选择整合包文件夹（里面要有 RimWorld、Config、排序文件 这三个文件夹）");
-                try { if (Directory.Exists(_ctx.Root)) d.SelectedPath = _ctx.Root; } catch { }
-                if (d.ShowDialog(this) != DialogResult.OK) return;
-
-                string sel = d.SelectedPath;
                 bool strict; List<string> notes; string pid;
                 int sc = PackDetector.Score(sel, out strict, out notes, out pid);
                 if (sc <= 0)
@@ -3847,22 +3876,19 @@ namespace Zogos
 
         void PfImportCsvFile()
         {
-            using (OpenFileDialog ofd = new OpenFileDialog())
+            string csv = PickFile(L.T("选择导出的 CSV 文件"), PickMode.OpenFile,
+                L.T("CSV 文件|*.csv;*.txt|所有文件|*.*"), null, null);
+            if (csv == null) return;
+            try
             {
-                ofd.Title = L.T("选择导出的 CSV 文件");
-                ofd.Filter = L.T("CSV 文件|*.csv;*.txt|所有文件|*.*");
-                if (ofd.ShowDialog(this) != DialogResult.OK) return;
-                try
+                string txt = File.ReadAllText(csv, Encoding.UTF8);
+                if (txt.IndexOf(L.T("整合包"), StringComparison.Ordinal) < 0 && txt.IndexOf("MOD", StringComparison.Ordinal) < 0)
                 {
-                    string txt = File.ReadAllText(ofd.FileName, Encoding.UTF8);
-                    if (txt.IndexOf(L.T("整合包"), StringComparison.Ordinal) < 0 && txt.IndexOf("MOD", StringComparison.Ordinal) < 0)
-                    {
-                        try { txt = File.ReadAllText(ofd.FileName, Encoding.Default); } catch { }
-                    }
-                    PfImportApply(txt);
+                    try { txt = File.ReadAllText(csv, Encoding.Default); } catch { }
                 }
-                catch (Exception ex) { _pfSubStatus.Text = L.T("读取失败：") + ex.Message; Render(); }
+                PfImportApply(txt);
             }
+            catch (Exception ex) { _pfSubStatus.Text = L.T("读取失败：") + ex.Message; Render(); }
         }
 
         void PfImportApply(string txt)
@@ -4382,16 +4408,11 @@ namespace Zogos
             if (dr == DialogResult.Cancel) return;
             bool full = (dr == DialogResult.Yes);
 
-            string outZip;
-            using (SaveFileDialog d = new SaveFileDialog())
-            {
-                d.Title = L.T("选择导出位置");
-                d.Filter = L.T("ZOGOS 整合包 (*.zip)|*.zip");
-                d.FileName = PackSpec.SuggestName(_ctx, _current, full);
-                try { d.InitialDirectory = Path.GetDirectoryName(_ctx.Root.TrimEnd((char)92)); } catch { }
-                if (d.ShowDialog(this) != DialogResult.OK) return;
-                outZip = d.FileName;
-            }
+            string dir0 = null;
+            try { dir0 = Path.GetDirectoryName(_ctx.Root.TrimEnd((char)92)); } catch { }
+            string outZip = PickFile(L.T("选择导出位置"), PickMode.SaveFile,
+                L.T("ZOGOS 整合包 (*.zip)|*.zip"), dir0, PackSpec.SuggestName(_ctx, _current, full));
+            if (outZip == null) return;
 
             SetBusy(true);
             SetBusyTask(L.T("正在导出整合包…"), full ? L.T("完整包：含游戏本体 + 全部模组") : L.T("轻量包：只含配置 + 排序"));
@@ -4446,15 +4467,11 @@ namespace Zogos
 
         private void ImportPack()
         {
-            string zip;
-            using (OpenFileDialog d = new OpenFileDialog())
-            {
-                d.Title = L.T("选择 ZOGOS 整合包压缩包");
-                d.Filter = L.T("ZOGOS 整合包 (*.zip)|*.zip|所有文件 (*.*)|*.*");
-                try { d.InitialDirectory = Path.GetDirectoryName(_ctx.Root.TrimEnd((char)92)); } catch { }
-                if (d.ShowDialog(this) != DialogResult.OK) return;
-                zip = d.FileName;
-            }
+            string dir0 = null;
+            try { dir0 = Path.GetDirectoryName(_ctx.Root.TrimEnd((char)92)); } catch { }
+            string zip = PickFile(L.T("选择 ZOGOS 整合包压缩包"), PickMode.OpenFile,
+                L.T("ZOGOS 整合包 (*.zip)|*.zip|所有文件 (*.*)|*.*"), dir0, null);
+            if (zip == null) return;
 
             SetStatus(L.T("正在检查压缩包…"));
             ZipPackInfo info;
@@ -4469,14 +4486,8 @@ namespace Zogos
             if (MinMsg.Show(this, head + "\r\n\r\n" + info.Describe() + L.T("\r\n继续导入吗？"), L.T("导入整合包"),
                 MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK) return;
 
-            string dest;
-            using (FolderBrowserDialog d = new FolderBrowserDialog())
-            {
-                d.Description = L.T("选择解压到哪个文件夹（会在里面生成整合包文件夹）");
-                try { d.SelectedPath = Path.GetDirectoryName(_ctx.Root.TrimEnd((char)92)); } catch { }
-                if (d.ShowDialog(this) != DialogResult.OK) return;
-                dest = d.SelectedPath;
-            }
+            string dest = PickFolder(L.T("选择解压到哪个文件夹（会在里面生成整合包文件夹）"), dir0);
+            if (dest == null) return;
 
             SetBusy(true);
             SetBusyTask(L.T("正在导入整合包…"), L.T("解压到 ") + dest);

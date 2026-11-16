@@ -74,16 +74,14 @@ namespace Zogos
 
                 if (dr == DialogResult.Yes)
                 {
-                    using (FolderBrowserDialog d = new FolderBrowserDialog())
+                    string pick = FilePick.Pick(null, "选择整合包文件夹（里面要有 RimWorld 文件夹）",
+                        PickMode.Folder, null, launcherDir, null);
+                    if (pick != null)
                     {
-                        d.Description = "选择整合包文件夹（里面要有 RimWorld 文件夹）";
-                        if (d.ShowDialog() == DialogResult.OK)
-                        {
-                            rootOverride = d.SelectedPath;
-                            p_rootOverride = rootOverride;
-                            ctx = PackContext.Detect(launcherDir, st, rootOverride, targetOverride, appData);
-                            Log.Info("玩家手动选择整合包目录: " + ctx.Root);
-                        }
+                        rootOverride = pick;
+                        p_rootOverride = rootOverride;
+                        ctx = PackContext.Detect(launcherDir, st, rootOverride, targetOverride, appData);
+                        Log.Info("玩家手动选择整合包目录: " + ctx.Root);
                     }
                 }
             }

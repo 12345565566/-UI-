@@ -787,17 +787,16 @@ namespace Zogos
                 };
                 file.Click += delegate(object s, EventArgs e)
                 {
-                    using (OpenFileDialog ofd = new OpenFileDialog())
+                    string csv = FilePick.Pick(dlg, L.T("选择导出的 CSV 文件"), PickMode.OpenFile,
+                        L.T("CSV 文件|*.csv;*.txt|所有文件|*.*"), null, null);
+                    if (csv == null) return;
                     {
-                        ofd.Title = L.T("选择导出的 CSV 文件");
-                        ofd.Filter = L.T("CSV 文件|*.csv;*.txt|所有文件|*.*");
-                        if (ofd.ShowDialog(dlg) != DialogResult.OK) return;
                         try
                         {
-                            string txt = File.ReadAllText(ofd.FileName, Encoding.UTF8);
+                            string txt = File.ReadAllText(csv, Encoding.UTF8);
                             if (txt.IndexOf(L.T("整合包"), StringComparison.Ordinal) < 0 && txt.IndexOf("MOD", StringComparison.Ordinal) < 0)
                             {
-                                try { txt = File.ReadAllText(ofd.FileName, Encoding.Default); } catch { }
+                                try { txt = File.ReadAllText(csv, Encoding.Default); } catch { }
                             }
                             box.Text = txt;
                         }

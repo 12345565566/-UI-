@@ -2,6 +2,36 @@
 
 格式：`版本 - 日期` ｜ 只记对用户或构建方式有影响的变化。
 
+## v3.0.0 - 2026-11-16
+
+全工程不再调用系统文件对话框：选文件 / 选文件夹改为**自绘选择器**。
+
+### 新增
+
+- **`src\PickUI.cs`**：主窗用的窗口内**覆盖层**（`PickOverlay` + `ElPickPanel / ElPickCrumb / ElPickSide / ElPickList`）。三种模式（选文件夹 / 打开文件 / 保存文件），面包屑（过宽折中间、Ctrl+L 走路径输入）、即时搜索 + 回车递归、三列列表（表头排序、双击进入、↑↓/PgUp/PgDn/Home/End），与创意工坊、个性化同一套动效与配色。
+- **`src\FolderPick.cs`**：其它窗口用的独立窗版 `FolderPickForm` + `FilePick.Pick` 静态入口，视觉与覆盖层版一致。
+
+### 改动
+
+- `MainForm` 新增 `PickNow / PickFolder / PickFile`，替换 7 处系统对话框；`ProcessDialogKey` 先让选择器吃键。
+- `MobileExportForm`(4)、`PackFeedForm`(1)、`WorkshopSyncForm`(1)、`Setup`(1)、`Program` 首次启动选目录(1) 全部改走 `FilePick.Pick`。
+- `MinTheme` 补 4 个 `T.DrawStr` 重载（本版没有文字描边，直通 `DrawString`）。
+- 版本号 `Log.Version` 由 **2.2.0 → 3.0.0**（标题栏自动跟着显示）。
+
+### 修复
+
+- `编译.bat` 命令行版（第二步）清单缺 `I18n.cs` / `ModAnalyzer.cs`，一直报 400+ 条 `CS0103` 并让脚本 `exit 1`。这是 HEAD 就有的老 bug，与本次并线无关；补上后两步都是 0 错误。
+
+### 为什么必须自绘
+
+本机 `OpenFileDialog` / `SaveFileDialog` / `FolderBrowserDialog`（含老式 `GetOpenFileName`）**在创建阶段就卡死**：主窗被模态锁住 → `AppHangB1` → 5 秒后强杀。用只含一句 `ShowDialog()` 的独立 exe 可复现，与项目代码无关。所以只能用自绘选择器规避。
+
+### 验证
+
+- 设置 → 整合包根目录【浏览】：窗口内覆盖层正常出现，Esc 关闭、页面恢复、输入框值不变。
+- 主页【导入整合包】：文件模式正常（底部「文件名」行、筛选、右侧细滚动条，不压底栏）。
+- `编译.bat` 全流程 0 错误；v3.0.0 exe 启动正常，标题栏显示 `v3.0.0`。
+
 ## v2.2.0 - 2026-11-15
 
 分享（导出）/ 导入整合包时有了真正的进度条。

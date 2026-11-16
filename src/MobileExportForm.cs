@@ -251,21 +251,16 @@ namespace Zogos
 
         private void PickDir()
         {
-            using (FolderBrowserDialog d = new FolderBrowserDialog())
-            {
-                d.Description = L.T("选择端游整合包目录（里面应该有 Mods 文件夹）");
-                if (d.ShowDialog(this) == DialogResult.OK) SetSource(d.SelectedPath);
-            }
+            string pick = FilePick.Pick(this, L.T("选择端游整合包目录（里面应该有 Mods 文件夹）"),
+                PickMode.Folder, null, _txtSrc.Text.Trim(), null);
+            if (pick != null) SetSource(pick);
         }
 
         private void PickZip()
         {
-            using (OpenFileDialog d = new OpenFileDialog())
-            {
-                d.Filter = L.T("整合包 (*.zip)|*.zip|所有文件 (*.*)|*.*");
-                d.Title = L.T("选择整合包 zip");
-                if (d.ShowDialog(this) == DialogResult.OK) SetSource(d.FileName);
-            }
+            string pick = FilePick.Pick(this, L.T("选择整合包 zip"), PickMode.OpenFile,
+                L.T("整合包 (*.zip)|*.zip|所有文件 (*.*)|*.*"), null, null);
+            if (pick != null) SetSource(pick);
         }
 
         private void SetSource(string path)
@@ -307,12 +302,9 @@ namespace Zogos
 
         private void PickCjk()
         {
-            using (OpenFileDialog d = new OpenFileDialog())
-            {
-                d.Filter = L.T("字体 mod (*.zip)|*.zip|所有文件 (*.*)|*.*");
-                d.Title = L.T("选择 RimDroidCJK 中文字体 mod 的 zip");
-                if (d.ShowDialog(this) == DialogResult.OK) _txtCjk.Text = d.FileName;
-            }
+            string pick = FilePick.Pick(this, L.T("选择 RimDroidCJK 中文字体 mod 的 zip"), PickMode.OpenFile,
+                L.T("字体 mod (*.zip)|*.zip|所有文件 (*.*)|*.*"), null, null);
+            if (pick != null) _txtCjk.Text = pick;
         }
 
         /// <summary>在几个常见位置自动找 RimDroidCJK 的 zip。</summary>
@@ -340,12 +332,12 @@ namespace Zogos
 
         private void PickOut()
         {
-            using (SaveFileDialog d = new SaveFileDialog())
-            {
-                d.Filter = L.T("手机版整合包 (*.zip)|*.zip");
-                d.FileName = string.IsNullOrEmpty(_txtOut.Text) ? L.T("手机版整合包.zip") : Path.GetFileName(_txtOut.Text);
-                if (d.ShowDialog(this) == DialogResult.OK) _txtOut.Text = d.FileName;
-            }
+            string name = string.IsNullOrEmpty(_txtOut.Text) ? L.T("手机版整合包.zip") : Path.GetFileName(_txtOut.Text);
+            string start = null;
+            try { if (!string.IsNullOrEmpty(_txtOut.Text)) start = Path.GetDirectoryName(_txtOut.Text); } catch { }
+            string pick = FilePick.Pick(this, L.T("选择手机版整合包保存位置"), PickMode.SaveFile,
+                L.T("手机版整合包 (*.zip)|*.zip"), start, name);
+            if (pick != null) _txtOut.Text = pick;
         }
 
         private void OpenOutDir()

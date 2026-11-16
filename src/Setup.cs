@@ -237,12 +237,9 @@ namespace Zogos
 
         private void Browse()
         {
-            using (FolderBrowserDialog d = new FolderBrowserDialog())
-            {
-                d.Description = L.T("选择安装位置（一般选整合包文件夹，或者随便找一个空文件夹）");
-                try { if (Directory.Exists(_tDir.Text.Trim())) d.SelectedPath = _tDir.Text.Trim(); } catch { }
-                if (d.ShowDialog(this) == DialogResult.OK) _tDir.Text = d.SelectedPath;
-            }
+            string pick = FilePick.Pick(this, L.T("选择安装位置（一般选整合包文件夹，或者随便找一个空文件夹）"),
+                PickMode.Folder, null, _tDir.Text.Trim(), null);
+            if (pick != null) _tDir.Text = pick;
         }
 
         private void UpdatePackUi()

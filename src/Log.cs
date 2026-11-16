@@ -8,7 +8,7 @@ namespace Zogos
     /// <summary>轻量日志：内存环形缓冲 + 磁盘追加，供界面实时显示与诊断报告使用。</summary>
     public static class Log
     {
-        public const string Version = "2.2.0";
+        public const string Version = "3.0.0";
         private static readonly object Sync = new object();
         private static readonly List<string> Buffer = new List<string>();
         private static readonly int BufMax = 4000;
