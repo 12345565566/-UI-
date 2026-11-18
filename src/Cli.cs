@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -301,7 +301,7 @@ namespace Zogos
             if (rc != 0) { Console.WriteLine("配置写入失败，已取消启动"); return rc; }
 
             Console.WriteLine();
-            if (st.StartSteam) SteamHelp.EnsureRunning();
+            if (st.CloseSteamBeforeLaunch) SteamHelp.EnsureClosed(); else if (st.StartSteam) SteamHelp.EnsureRunning();
 
             Process p = GameLauncher.Start(ctx);
             bool exited;

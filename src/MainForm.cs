@@ -106,8 +106,10 @@ namespace Zogos
         readonly ElText[] _setK = new ElText[4];
         ElInput _tRoot, _tTarget, _tSortDir, _nKeep;
         readonly ElBtn[] _setBrowse = new ElBtn[3];
-        readonly ElCheck[] _chk = new ElCheck[7];
+        readonly ElCheck[] _chk = new ElCheck[8];
         ElText _lbSetStatus;
+        ElText _lbDirty;                 // 「有未保存的修改」提示（贴保存按钮上方）
+        bool _setDirty;
         ElBtn _btnSave, _btnOpenBackup, _btnRestore, _btnRedetect, _btnBind, _btnReapply;
         ElBtn _btnSwitchPack; // 左卡片内「切换整合包」（展开态常驻，折叠态隐藏——折叠时由「更多功能」菜单提供）
 
@@ -574,14 +576,33 @@ namespace Zogos
                 "替换前清空原有的 Config 内容",
                 "同时同步游戏目录内的 Config（可能覆盖你的设置，建议关）",
                 "启动前检查并启动 Steam",
+                "启动前先关掉 Steam（避免未购买的 DLC 被隐藏）",
                 "路径含中文时弹出警告",
                 "启动游戏后最小化启动器",
                 "每次启动都重置配置（会覆盖画面设置）",
             };
-            for (int i = 0; i < 7; i++)
+            for (int i = 0; i < 8; i++)
+            {
                 _chk[i] = AddEl(_setEls, new ElCheck(L.T(cks[i]), false));
+                _chk[i].Changed += delegate { MarkSetDirty(); };   // 勾一下就算「有改动」
+            }
+            // 「启动 Steam」和「关掉 Steam」互斥：勾一个自动取消另一个
+            _chk[3].Changed += delegate
+            {
+                if (_chk[3].Checked && _chk[4].Checked) _chk[4].Checked = false;
+                MarkSetDirty(); Render();
+            };
+            _chk[4].Changed += delegate
+            {
+                if (_chk[4].Checked && _chk[3].Checked) _chk[3].Checked = false;
+                MarkSetDirty(); Render();
+            };
+            foreach (var inp in new[] { _tRoot, _tTarget, _tSortDir, _nKeep })
+                inp.TextChanged += delegate { MarkSetDirty(); };
 
             _lbSetStatus = AddEl(_setEls, new ElText("") { FontOf = () => T.F(11.5f), ColorOf = () => T.Text3 });
+            // 有未保存修改时的提示：贴在保存按钮上方，改任何设置就亮
+            _lbDirty = AddEl(_setEls, new ElText("") { FontOf = () => T.F(12), ColorOf = () => T.Accent, Center = true, Visible = false });
 
             // 界面缩放：一排直选档位（点谁切谁，当前档高亮），放在「备份保留数量」行右侧空位
             _lbScale = AddEl(_setEls, new ElText(L.T("界面缩放")) { FontOf = () => T.F(12), ColorOf = () => T.Text2 });
@@ -790,7 +811,7 @@ namespace Zogos
                 for (int i = 0; i < _scaleOpts.Length; i++) { _scaleOpts[i].SetBounds(sx, sy, 54, 26); sx += 54 + 6; }
             }
             int colW = Math.Max(140, (cw - 2 * m - 20) / 2);
-            for (int i = 0; i < 7; i++)
+            for (int i = 0; i < 8; i++)
             {
                 int col = i % 2, row = i / 2;
                 _chk[i].SetBounds(cx + m + col * (colW + 20), ckTop + row * 30, colW, 26);
@@ -802,6 +823,7 @@ namespace Zogos
 
             int btnY = cy0 + ch - 22 - 36;
             _lbSetStatus.SetBounds(cx + m + 110, btnY - 30, cw - 2 * m - 110, 24);
+            if (_lbDirty != null) _lbDirty.SetBounds(cx + cw - m - 320, btnY - 56, 320, 24);
 
             // 日志覆盖层展开时跟随卡片尺寸（窗口折叠/展开后重排也能对上）
             if (_logOpen) LayoutLogOverlay(LogOverlayRect(), true);
@@ -1292,10 +1314,50 @@ namespace Zogos
             if (el != null) el.OnMouseMove(lp);
             Cursor = el != null ? el.CursorOf(lp) : Cursors.Default;
         }
+        ElInput _rightInput;   // 右键按下时命中的输入框（菜单在右键松开时弹，避免一弹出就被失焦关掉）
+
+        /// <summary>输入框右键菜单：复制 / 粘贴 / 清空。用现成的 MenuPopup（独立分层窗口，失焦自动关）。</summary>
+        void ShowInputMenu(ElInput inp, Point clientPhysical)
+        {
+            if (inp == null) return;
+            var menu = new MenuPopup();
+            menu.AddLabel(string.IsNullOrEmpty(inp.Text) ? L.T("（空）") : (inp.Text.Length > 28 ? inp.Text.Substring(0, 28) + "…" : inp.Text));
+            menu.AddItem(L.T("复制"), delegate
+            {
+                try { if (!string.IsNullOrEmpty(inp.Text)) { bool okc = Clip.Set(inp.Text); Log.Info(L.T("右键菜单：已复制 ") + inp.Text.Length + L.T(" 字，写入=") + okc); Toast(okc ? L.T("已复制到剪贴板") : L.T("写剪贴板失败")); } }
+                catch (Exception ex) { Log.Warn(L.T("右键菜单：复制失败 ") + ex.Message); }
+            });
+            menu.AddItem(L.T("粘贴"), delegate
+            {
+                try
+                {
+                    string s = Clip.Get();
+                    if (string.IsNullOrEmpty(s)) { Log.Warn(L.T("右键菜单：粘贴时剪贴板没有文字")); Toast(L.T("剪贴板里没有文字")); return; }
+                    inp.OnCtrlKey(Keys.V);
+                    Log.Info(L.T("右键菜单：已粘贴 ") + s.Length + L.T(" 字，当前长度 ") + inp.Text.Length);
+                    Toast(L.T("已粘贴 ") + s.Length + L.T(" 字"));
+                }
+                catch (Exception ex) { Log.Warn(L.T("右键菜单：粘贴失败 ") + ex.Message); }
+            });
+            menu.AddItem(L.T("清空"), delegate
+            {
+                try { inp.SetText(""); Log.Info(L.T("右键菜单：已清空")); }
+                catch (Exception ex) { Log.Warn(L.T("右键菜单：清空失败 ") + ex.Message); }
+            });
+            menu.LogicalMinWidth = 140;
+            try { menu.ShowAt(PointToScreen(clientPhysical)); } catch (Exception ex) { Log.Warn(L.T("右键菜单打开失败：") + ex.Message); }
+        }
+
         protected override void OnMouseDown(MouseEventArgs e)
         {
             base.OnMouseDown(e);
             Point lp = ToLogical(e.Location);
+            // 输入框右键：按下只记录目标，松开才弹菜单（在按下时 Show 会被随后的失焦立刻关掉）
+            if (e.Button == MouseButtons.Right)
+            {
+                _rightInput = Pick(lp) as ElInput;
+                return;
+            }
             var el = Pick(lp);
             MTrace("down @ " + lp.X + "," + lp.Y + " -> " + ElName(el));
             SetFocusInput(el as ElInput); // 点到输入框→获得焦点；点到别处→交出焦点
@@ -1306,6 +1368,12 @@ namespace Zogos
         {
             base.OnMouseUp(e);
             Point lp = ToLogical(e.Location);
+            if (e.Button == MouseButtons.Right)
+            {
+                ElInput rInp2 = _rightInput; _rightInput = null;
+                if (rInp2 != null) ShowInputMenu(rInp2, e.Location);
+                return;
+            }
             MTrace("up @ " + lp.X + "," + lp.Y + " capture=" + ElName(_captureEl));
             var el = _captureEl;
             _captureEl = null;
@@ -1365,6 +1433,7 @@ namespace Zogos
                     if (_overlayEls == _pfEls && _pfSubMode == "submit" && _focusInput != null) { PfDoSubmit(); return true; }
                     if (_overlayEls == _mgEls && _focusInput == _mgSearch) { MgSearchMods(); return true; }
                 }
+                if ((keyData & Keys.Control) != 0 && _focusInput != null && _focusInput.OnCtrlKey(k0)) return true;
                 if (_focusInput != null && _focusInput.OnKey(k0)) return true;
                 return base.ProcessDialogKey(keyData);
             }
@@ -1381,6 +1450,7 @@ namespace Zogos
                     return true;
                 }
                 if (k == Keys.Escape) { SetFocusInput(null); return true; }
+                if ((keyData & Keys.Control) != 0 && _focusInput.OnCtrlKey(k)) return true;
                 if (_focusInput.OnKey(k)) return true;
             }
             return base.ProcessDialogKey(keyData);
@@ -1610,10 +1680,14 @@ namespace Zogos
             _chk[1].Checked = _st.ClearConfig;
             _chk[2].Checked = _st.SyncGameConfig;
             _chk[3].Checked = _st.StartSteam;
-            _chk[4].Checked = _st.WarnNonAscii;
-            _chk[5].Checked = _st.MinimizeAfterLaunch;
-            _chk[6].Checked = _st.ReplaceEveryTime;
+            _chk[4].Checked = _st.CloseSteamBeforeLaunch;
+            _chk[5].Checked = _st.WarnNonAscii;
+            _chk[6].Checked = _st.MinimizeAfterLaunch;
+            _chk[7].Checked = _st.ReplaceEveryTime;
+            if (_chk[4].Checked) _chk[3].Checked = false;   // 互斥：以「关 Steam」为准
             _lbSetStatus.Text = L.T("设置文件：") + _st.IniPath;
+            _setDirty = false;
+            UpdateSetDirty();
         }
 
         private void UpdateAllUi()
@@ -2086,8 +2160,17 @@ namespace Zogos
         {
             ThreadPool.QueueUserWorkItem(delegate(object o)
             {
-                try { if (_st.StartSteam) SteamHelp.EnsureRunning(); }
-                catch (Exception ex) { Log.Warn(L.T("Steam 检查失败：") + ex.Message); }
+                try
+                {
+                    if (_st.CloseSteamBeforeLaunch)
+                    {
+                        // 勾了这个：启动前把 Steam 关掉（Steam 在跑会隐藏未购买的 DLC，模组就加载失败）
+                        try { BeginInvoke((MethodInvoker)delegate { Toast(L.T("正在关闭 Steam（避免 DLC 被隐藏）…")); }); } catch { }
+                        SteamHelp.EnsureClosed();
+                    }
+                    else if (_st.StartSteam) SteamHelp.EnsureRunning();
+                }
+                catch (Exception ex) { Log.Warn(L.T("Steam 处理失败：") + ex.Message); }
                 try
                 {
                     if (IsHandleCreated && !IsDisposed)
@@ -2228,6 +2311,26 @@ namespace Zogos
         // =================================================================
         //  设置 / 还原
         // =================================================================
+        /// <summary>设置页有改动：亮提示 + 弹一次右上角 Toast（勾完没保存的坑）。</summary>
+        void MarkSetDirty()
+        {
+            if (_setDirty) return;
+            _setDirty = true;
+            UpdateSetDirty();
+            Toast(L.T("设置已改动，点右下角『保存设置』后才会生效"));
+            Render();
+        }
+
+        void UpdateSetDirty()
+        {
+            if (_lbDirty != null)
+            {
+                _lbDirty.Visible = _setDirty;
+                _lbDirty.Text = L.T("● 有未保存的修改，点『保存设置』生效");
+            }
+            if (_btnSave != null) _btnSave.AccentEdge = _setDirty;   // 按钮跟着变青边
+        }
+
         private void SaveSettingsFromUi()
         {
             _st.Root = _tRoot.Text.Trim();
@@ -2243,16 +2346,19 @@ namespace Zogos
             _st.KeepBackups = Math.Max(1, Math.Min(200, keep));
             _st.AutoBackup = _chk[0].Checked;
             _st.ClearConfig = _chk[1].Checked;
-            _st.ReplaceEveryTime = _chk[6].Checked;
+            _st.ReplaceEveryTime = _chk[7].Checked;
             _st.SyncGameConfig = _chk[2].Checked;
-            _st.StartSteam = _chk[3].Checked;
-            _st.WarnNonAscii = _chk[4].Checked;
-            _st.MinimizeAfterLaunch = _chk[5].Checked;
+            _st.CloseSteamBeforeLaunch = _chk[4].Checked;
+            _st.StartSteam = _chk[4].Checked ? false : _chk[3].Checked;
+            _st.WarnNonAscii = _chk[5].Checked;
+            _st.MinimizeAfterLaunch = _chk[6].Checked;
             _st.UiDark = T.Dark;
             _st.Save();
             Log.Info(L.T("设置已保存：") + _st.IniPath);
             Redetect();
             _lbSetStatus.Text = L.T("已保存 · ") + DateTime.Now.ToString("HH:mm:ss");
+            _setDirty = false;
+            UpdateSetDirty();
         }
 
         /// <summary>一键切换整合包（含 1.6 / 1.7 版本隔离）。已并轨为内嵌覆盖层，见 PsOpen()。</summary>

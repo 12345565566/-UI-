@@ -1482,6 +1482,7 @@ namespace Zogos
         public void AddLabel(string text) { _items.Add(new Item { Text = text, Label = true }); }
 
         System.Windows.Forms.Timer _openAnim;
+        DateTime _shownAt = DateTime.MinValue;   // 弹出时刻：500ms 内的失焦不算数（否则菜单一闪就没）
 
         public void ShowAt(Point screenPos)
         {
@@ -1493,6 +1494,7 @@ namespace Zogos
                     rows += it.Label ? 22 : ROW;
                     w = Math.Max(w, TextRenderer.MeasureText(it.Text, it.Label ? T.F(11) : T.F(MenuFontPx)).Width + PADX * 2 + 8);
                 }
+            _shownAt = DateTime.Now;
             Size = new Size((int)(w * UiScale + 0.5f), (int)((rows + 12) * UiScale + 0.5f)); // 逻辑 → 物理
             Location = screenPos;
             var scr = Screen.FromPoint(screenPos).WorkingArea;
@@ -1551,7 +1553,15 @@ namespace Zogos
             int h = RowAt((int)(e.Y / UiScale));
             if (h >= 0) { var act = _items[h].Act; Close(); if (act != null) act(); }
         }
-        protected override void OnDeactivate(EventArgs e) { base.OnDeactivate(e); Close(); }
+        protected override void OnDeactivate(EventArgs e)
+        {
+            base.OnDeactivate(e);
+            // 刚弹出的 500ms 内忽略失焦（弹出时主窗/焦点变化会立刻把它关掉，表现为「右键没反应」）；
+            // 鼠标还停在菜单上也不关（点菜单项时也会触发失焦事件）。
+            if ((DateTime.Now - _shownAt).TotalMilliseconds < 500) return;
+            if (Bounds.Contains(Cursor.Position)) return;
+            Close();
+        }
 
         protected override void PaintContent(Graphics g)
         {

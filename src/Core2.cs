@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -412,6 +412,40 @@ namespace Zogos
             }
             catch { }
             return null;
+        }
+
+        /// <summary>启动前把 Steam 关掉：Steam 在跑时，未购买的 DLC 内容会被游戏隐藏，
+        /// 依赖这些 DLC 的模组就会报错（Player.log 里 Could not recover ... Giving up.）。</summary>
+        public static bool EnsureClosed(int waitSec = 12)
+        {
+            if (!IsRunning()) { Log.Info(L.T("Steam 没在运行（保持关闭，未购买的 DLC 不会被隐藏）")); return true; }
+            Log.Info(L.T("启动前关闭 Steam（避免未购买的 DLC 被隐藏）"));
+            try
+            {
+                string exe2 = SteamExe();
+                if (!string.IsNullOrEmpty(exe2))
+                {
+                    var psi = new ProcessStartInfo(exe2, "-shutdown");
+                    psi.UseShellExecute = false;
+                    Process.Start(psi);
+                }
+            }
+            catch (Exception ex) { Log.Warn(L.T("给 Steam 发关闭命令失败：") + ex.Message); }
+            for (int i = 0; i < waitSec * 2; i++)
+            {
+                Thread.Sleep(500);
+                if (!IsRunning()) { Log.Info(L.T("Steam 已关闭")); return true; }
+            }
+            try
+            {
+                foreach (Process ps in Process.GetProcessesByName("steam")) { try { ps.Kill(); } catch { } }
+                Thread.Sleep(800);
+            }
+            catch { }
+            bool ok = !IsRunning();
+            if (ok) Log.Warn(L.T("Steam 已强制关闭"));
+            else Log.Warn(L.T("Steam 关不掉（可能有提权进程），游戏可能仍会隐藏 DLC"));
+            return ok;
         }
 
         public static void EnsureRunning()

@@ -757,6 +757,9 @@ namespace Zogos
         public bool SyncMigrated = false;
         public bool SyncGameConfig = false;
         public bool StartSteam = true;
+        /// <summary>启动前先关掉 Steam：Steam 在跑时会隐藏「未购买」的 DLC 内容，
+        /// 依赖这些 DLC 的模组就会加载失败（Player.log: Could not recover ... Giving up.）。</summary>
+        public bool CloseSteamBeforeLaunch = false;
         public bool WarnNonAscii = true;
         public bool MinimizeAfterLaunch = true;
         public int KeepBackups = 10;
@@ -822,6 +825,7 @@ namespace Zogos
                         case "SyncMigrated": s.SyncMigrated = v == "1"; break;
                         case "SyncGameConfig": s.SyncGameConfig = v == "1"; break;
                         case "StartSteam": s.StartSteam = v == "1"; break;
+                    case "CloseSteamBeforeLaunch": s.CloseSteamBeforeLaunch = v == "1"; break;
                         case "WarnNonAscii": s.WarnNonAscii = v == "1"; break;
                         case "MinimizeAfterLaunch": s.MinimizeAfterLaunch = v == "1"; break;
                         case "SteamCmdPath": s.SteamCmdPath = v; break;
@@ -899,6 +903,7 @@ namespace Zogos
                 sb.AppendLine("SyncMigrated=" + (SyncMigrated ? "1" : "0"));
                 sb.AppendLine("SyncGameConfig=" + (SyncGameConfig ? "1" : "0"));
                 sb.AppendLine("StartSteam=" + (StartSteam ? "1" : "0"));
+                sb.AppendLine("CloseSteamBeforeLaunch=" + (CloseSteamBeforeLaunch ? "1" : "0"));
                 sb.AppendLine("WarnNonAscii=" + (WarnNonAscii ? "1" : "0"));
                 sb.AppendLine("MinimizeAfterLaunch=" + (MinimizeAfterLaunch ? "1" : "0"));
                 sb.AppendLine("KeepBackups=" + KeepBackups);

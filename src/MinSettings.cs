@@ -64,6 +64,60 @@ namespace Zogos
             Changed();
         }
 
+        /// <summary>整段替换文本（右键菜单「清空」等用；会触发 TextChanged）。</summary>
+        public void SetText(string s)
+        {
+            Text = s ?? "";
+            _caret = Text.Length;
+            ClampNumeric();
+            Changed();
+        }
+
+        /// <summary>Ctrl 组合键（复制/粘贴/剪切/全选）。自绘输入框不走系统编辑，必须自己实现。</summary>
+        public bool OnCtrlKey(Keys k)
+        {
+            switch (k)
+            {
+                case Keys.A:
+                    return true;
+                case Keys.C:
+                    try { if (!string.IsNullOrEmpty(Text)) Clip.Set(Text); } catch { }
+                    return true;
+                case Keys.X:
+                    try
+                    {
+                        if (string.IsNullOrEmpty(Text)) return true;
+                        Clip.Set(Text);
+                        Text = ""; _caret = 0; Changed();
+                    }
+                    catch { }
+                    return true;
+                case Keys.V:
+                    try
+                    {
+                        string s = Clip.Get();
+                        if (string.IsNullOrEmpty(s)) return true;
+                        s = s.Replace("\r", "").Replace("\n", "").Replace("\t", "");
+                        if (NumericOnly)
+                        {
+                            var sb = new System.Text.StringBuilder();
+                            foreach (char ch in s) if (ch >= '0' && ch <= '9') sb.Append(ch);
+                            s = sb.ToString();
+                        }
+                        if (s.Length == 0) return true;
+                        if (_caret < 0) _caret = 0;
+                        if (_caret > Text.Length) _caret = Text.Length;
+                        Text = Text.Insert(_caret, s);
+                        _caret += s.Length;
+                        ClampNumeric();
+                        Changed();
+                    }
+                    catch { }
+                    return true;
+            }
+            return false;
+        }
+
         /// <summary>方向/编辑键；返回 true 表示已消费</summary>
         public bool OnKey(Keys k)
         {
@@ -476,6 +530,60 @@ namespace Zogos
                         g.DrawLine(pen, cx, cy + 2, cx, cy + LineH - 3);
             }
             g.ResetClip();
+        }
+    }
+    /// <summary>不依赖 STA/OLE 的剪贴板（Clipboard.GetText 在非 STA 线程会抛「必须 STA」）。
+    /// 直接走 Win32 OpenClipboard/GetClipboardData，任何线程都能读。</summary>
+    static class Clip
+    {
+        [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool OpenClipboard(IntPtr hWndNewOwner);
+        [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool CloseClipboard();
+        [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool EmptyClipboard();
+        [System.Runtime.InteropServices.DllImport("user32.dll")] static extern IntPtr GetClipboardData(uint uFormat);
+        [System.Runtime.InteropServices.DllImport("user32.dll")] static extern IntPtr SetClipboardData(uint uFormat, IntPtr hMem);
+        [System.Runtime.InteropServices.DllImport("kernel32.dll")] static extern IntPtr GlobalAlloc(uint uFlags, UIntPtr dwBytes);
+        [System.Runtime.InteropServices.DllImport("kernel32.dll")] static extern IntPtr GlobalLock(IntPtr hMem);
+        [System.Runtime.InteropServices.DllImport("kernel32.dll")] static extern bool GlobalUnlock(IntPtr hMem);
+        [System.Runtime.InteropServices.DllImport("kernel32.dll")] static extern IntPtr GlobalFree(IntPtr hMem);
+
+        const uint CF_UNICODETEXT = 13, GMEM_MOVEABLE = 0x0002;
+
+        public static string Get()
+        {
+            if (!OpenClipboard(IntPtr.Zero)) return null;
+            try
+            {
+                IntPtr h = GetClipboardData(CF_UNICODETEXT);
+                if (h == IntPtr.Zero) return null;
+                IntPtr p = GlobalLock(h);
+                if (p == IntPtr.Zero) return null;
+                try { return System.Runtime.InteropServices.Marshal.PtrToStringUni(p); }
+                finally { GlobalUnlock(h); }
+            }
+            catch { return null; }
+            finally { CloseClipboard(); }
+        }
+
+        public static bool Set(string s)
+        {
+            if (s == null) s = "";
+            if (!OpenClipboard(IntPtr.Zero)) return false;
+            try
+            {
+                EmptyClipboard();
+                int bytes = (s.Length + 1) * 2;
+                IntPtr h = GlobalAlloc(GMEM_MOVEABLE, (UIntPtr)bytes);
+                if (h == IntPtr.Zero) return false;
+                IntPtr p = GlobalLock(h);
+                if (p == IntPtr.Zero) { GlobalFree(h); return false; }
+                for (int i = 0; i < s.Length; i++) System.Runtime.InteropServices.Marshal.WriteInt16(p, i * 2, s[i]);
+                System.Runtime.InteropServices.Marshal.WriteInt16(p, s.Length * 2, 0);
+                GlobalUnlock(h);
+                if (SetClipboardData(CF_UNICODETEXT, h) == IntPtr.Zero) { GlobalFree(h); return false; }
+                return true;
+            }
+            catch { return false; }
+            finally { CloseClipboard(); }
         }
     }
 }
